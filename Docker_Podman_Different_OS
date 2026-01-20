@@ -1,0 +1,101 @@
+---
+# ==========================================================
+# Playbook: Install Container Engine (Docker / Podman)
+# Target : junoon_servers
+# Purpose:
+#   - Ubuntu        -> Docker
+#   - Amazon Linux  -> Docker
+#   - RedHat (RHEL) -> Podman
+# ==========================================================
+
+- name: Install container engine based on OS
+  hosts: junoon_servers
+  become: yes
+
+  tasks:
+
+    # ------------------------------------------------------
+    # 1️⃣ Gather OS information (facts)
+    # ------------------------------------------------------
+    - name: Gather system facts
+      setup:
+
+    # ------------------------------------------------------
+    # 2️⃣ Install Docker on Ubuntu
+    # ------------------------------------------------------
+    - name: Install Docker on Ubuntu
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+      when: ansible_distribution == "Ubuntu"
+
+    # ------------------------------------------------------
+    # 3️⃣ Start & enable Docker on Ubuntu
+    # ------------------------------------------------------
+    - name: Start and enable Docker on Ubuntu
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      when: ansible_distribution == "Ubuntu"
+
+    # ------------------------------------------------------
+    # 4️⃣ Install Docker on Amazon Linux
+    # ------------------------------------------------------
+    - name: Install Docker on Amazon Linux
+      dnf:
+        name: docker
+        state: present
+      when: ansible_distribution == "Amazon"
+
+    # ------------------------------------------------------
+    # 5️⃣ Start & enable Docker on Amazon Linux
+    # ------------------------------------------------------
+    - name: Start and enable Docker on Amazon Linux
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      when: ansible_distribution == "Amazon"
+
+    # ------------------------------------------------------
+    # 6️⃣ Install Podman on RedHat (RHEL 8/9/10)
+    # ------------------------------------------------------
+    - name: Install Podman on RedHat
+      dnf:
+        name: podman
+        state: present
+      when: ansible_distribution == "RedHat"
+
+    # ------------------------------------------------------
+    # 7️⃣ Verify Podman installation (RedHat)
+    # ------------------------------------------------------
+    - name: Verify Podman installation
+      command: podman --version
+      register: podman_output
+      changed_when: false
+      when: ansible_distribution == "RedHat"
+
+    # ------------------------------------------------------
+    # 8️⃣ Add current user to docker group (Docker systems)
+    # ------------------------------------------------------
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user_id }}"
+        groups: docker
+        append: yes
+      when: ansible_distribution in ["Ubuntu", "Amazon"]
+
+    # ------------------------------------------------------
+    # 9️⃣ Verify container engine
+    # ------------------------------------------------------
+    - name: Verify Docker
+      command: docker ps
+      changed_when: false
+      when: ansible_distribution in ["Ubuntu", "Amazon"]
+
+    - name: Verify Podman
+      command: podman ps
+      changed_when: false
+      when: ansible_distribution == "RedHat"
