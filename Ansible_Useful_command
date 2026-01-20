@@ -1,0 +1,6 @@
+ansible junoon_servers -m command -a "systemctl is-active docker" | grep -E "SUCCESS|FAILED|active"
+ansible junoon_servers -m command -a "podman --version" | grep -E "SUCCESS|FAILED|podman"
+ansible junoon_servers -m command -a "podman --version" -o
+ansible junoon_servers -m command -a "systemctl is-active docker" -o
+ansible junoon_servers -m command -a "podman --version" -o | grep FAILED
+ansible junoon_servers -m command -a "podman --version" -o | grep SUCCESS
