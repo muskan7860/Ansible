@@ -1,65 +1,106 @@
 ---
-# FIX 1: YAML must start with "- name", not just "-"
-- name: Install Docker
+- name: Install and Configure Docker
   hosts: junoon_servers
   become: yes
 
   tasks:
 
-    # FIX 2: Correct typo "docer-ce.repo" → "docker-ce.repo"
-    # Repo is needed only for RedHat / CentOS
-    - name: Add Docker repo
+    # -------------------------------
+    # Add Docker repository (RHEL / CentOS / Amazon)
+    # -------------------------------
+    - name: Add Docker repository for RedHat-based systems
       get_url:
         url: https://download.docker.com/linux/centos/docker-ce.repo
         dest: /etc/yum.repos.d/docker-ce.repo
-      when: ansible_distribution in ['CentOS', 'RedHat']
+      when: ansible_distribution in ['CentOS', 'RedHat', 'Amazon']
 
-    # FIX 3: RedHat uses yum/dnf → dnf is OK
-    - name: Install Docker when OS is RedHat
+    # -------------------------------
+    # Install Docker on RedHat
+    # -------------------------------
+    - name: Install Docker on RedHat
       dnf:
         name: docker-ce
         state: present
       when: ansible_distribution == 'RedHat'
 
-    # FIX 4: Amazon Linux uses yum, NOT dnf
-    - name: Install Docker when OS is Amazon
-      yum:
+    # -------------------------------
+    # Install Docker on Amazon Linux
+    # -------------------------------
+    - name: Install Docker on Amazon Linux
+      dnf:
         name: docker
         state: present
       when: ansible_distribution == 'Amazon'
 
-    # FIX 5: Ubuntu installation is correct
-    - name: Install docker when OS is Ubuntu
+    # -------------------------------
+    # Install Docker on Ubuntu
+    # -------------------------------
+    - name: Install Docker on Ubuntu
       apt:
         name: docker.io
-        state: present
+        state: latest
         update_cache: yes
       when: ansible_distribution == 'Ubuntu'
 
-    # FIX 6: Start + enable docker service (correct)
-    - name: Start Docker
+    # -------------------------------
+    # Configure iptables for Amazon Linux
+    # -------------------------------
+    - name: Install iptables services on Amazon Linux
+      dnf:
+        name: iptables-services
+        state: present
+      when: ansible_distribution == 'Amazon'
+
+    - name: Set iptables to legacy mode on Amazon Linux
+      command: alternatives --set iptables /usr/sbin/iptables-legacy
+      when: ansible_distribution == 'Amazon'
+
+    - name: Set ip6tables to legacy mode on Amazon Linux
+      command: alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+      when: ansible_distribution == 'Amazon'
+
+    - name: Enable and start iptables service on Amazon Linux
+      service:
+        name: iptables
+        state: started
+        enabled: yes
+      when: ansible_distribution == 'Amazon'
+
+    # -------------------------------
+    # Start and enable Docker service
+    # -------------------------------
+    - name: Start and enable Docker
       service:
         name: docker
         state: started
         enabled: yes
 
-    # FIX 7: ansible_user_id must be a variable, not string
-    - name: adding existing user to group docker
+    # -------------------------------
+    # Add current user to docker group
+    # -------------------------------
+    - name: Add user to docker group
       user:
         name: "{{ ansible_user_id }}"
         groups: docker
         append: yes
 
-    # FIX 8: docker ps needs root OR new login
-    # Use become: yes so it doesn't fail
-    - name: Verify that the containers are running
+    # -------------------------------
+    # Verify Docker is running
+    # -------------------------------
+    - name: Verify running containers
       command: docker ps
-      become: yes
+      register: docker_output
+      changed_when: false
 
-    # FIX 9: OS upgrade should NOT be in Docker playbook
-    # (kept it because you had it, but commented why)
-    #- name: Update and upgrade packages (Ubuntu only)
-    # apt:
-    #   update_cache: yes
-    #   upgrade: dist
-    # when: ansible_distribution == 'Ubuntu'
+    - name: Show Docker status
+      debug:
+        var: docker_output.stdout
+
+    # -------------------------------
+    # Update and upgrade Ubuntu packages
+    # -------------------------------
+    - name: Update and upgrade packages on Ubuntu
+      apt:
+        update_cache: yes
+        upgrade: dist
+      when: ansible_distribution == 'Ubuntu'
