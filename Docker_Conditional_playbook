@@ -1,0 +1,65 @@
+---
+# FIX 1: YAML must start with "- name", not just "-"
+- name: Install Docker
+  hosts: junoon_servers
+  become: yes
+
+  tasks:
+
+    # FIX 2: Correct typo "docer-ce.repo" → "docker-ce.repo"
+    # Repo is needed only for RedHat / CentOS
+    - name: Add Docker repo
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+      when: ansible_distribution in ['CentOS', 'RedHat']
+
+    # FIX 3: RedHat uses yum/dnf → dnf is OK
+    - name: Install Docker when OS is RedHat
+      dnf:
+        name: docker-ce
+        state: present
+      when: ansible_distribution == 'RedHat'
+
+    # FIX 4: Amazon Linux uses yum, NOT dnf
+    - name: Install Docker when OS is Amazon
+      yum:
+        name: docker
+        state: present
+      when: ansible_distribution == 'Amazon'
+
+    # FIX 5: Ubuntu installation is correct
+    - name: Install docker when OS is Ubuntu
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+      when: ansible_distribution == 'Ubuntu'
+
+    # FIX 6: Start + enable docker service (correct)
+    - name: Start Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    # FIX 7: ansible_user_id must be a variable, not string
+    - name: adding existing user to group docker
+      user:
+        name: "{{ ansible_user_id }}"
+        groups: docker
+        append: yes
+
+    # FIX 8: docker ps needs root OR new login
+    # Use become: yes so it doesn't fail
+    - name: Verify that the containers are running
+      command: docker ps
+      become: yes
+
+    # FIX 9: OS upgrade should NOT be in Docker playbook
+    # (kept it because you had it, but commented why)
+    #- name: Update and upgrade packages (Ubuntu only)
+    # apt:
+    #   update_cache: yes
+    #   upgrade: dist
+    # when: ansible_distribution == 'Ubuntu'
