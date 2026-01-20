@@ -1,3 +1,4 @@
+#docker is not compatible to redhat,podman is compatible.next updated version on pdodman file.
 ---
 - name: Install and Configure Docker
   hosts: junoon_servers
